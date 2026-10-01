@@ -1,4 +1,4 @@
-import * as anchor from "@coral-xyz/anchor";
+﻿import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import {
   TOKEN_PROGRAM_ID,
@@ -18,7 +18,7 @@ import {
 } from "@solana/web3.js";
 import { assert, expect } from "chai";
 
-describe("gpulease — escrow market for idle GPUs", () => {
+describe("gpulease â€” escrow market for idle GPUs", () => {
   const provider = Keypair.generate();   // person renting out idle GPUs
   const customer = Keypair.generate();   // person paying for a job
 
@@ -197,7 +197,7 @@ describe("gpulease — escrow market for idle GPUs", () => {
     const providerAcc = await getAccount(connection, providerPaymentAcc);
     expect(providerAcc.amount.toNumber()).to.equal(650); // 500 seeded + 150 payout
 
-    // Receipt is gone — that is the on-chain "work delivered" signal.
+    // Receipt is gone â€” that is the on-chain "work delivered" signal.
     const receiptAcc = await getAccount(connection, customerReceiptAcc);
     expect(receiptAcc.amount.toNumber()).to.equal(0);
   });

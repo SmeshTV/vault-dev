@@ -1,15 +1,15 @@
-use anchor_lang::prelude::*;
+﻿use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Burn, Mint, MintTo, Token, TokenAccount, Transfer};
 
-declare_id!("11111111111111111111111111111111");
+declare_id!("FR5U3cAx8jhCn2vH9WHcYfqgx11qEzaDdZ5afMooLkJY");
 
 // ============================================================================
-// GPULEASE — market for idle GPUs
+// GPULEASE â€” market for idle GPUs
 //
 // Adapted from 0xnurda/vault-dev (simple_vault) for Solana Create.
-// Original 3 functions: initialize_vault → deposit → withdraw
+// Original 3 functions: initialize_vault â†’ deposit â†’ withdraw
 // Ours, same mechanics, our semantics:
-//   initialize_market → place_order → settle_order
+//   initialize_market â†’ place_order â†’ settle_order
 //
 // The original vault was a pooled share-token vault. We kept that exact
 // mechanism because it *is* an escrow, which is what our product needs:
@@ -23,9 +23,9 @@ pub mod gpulease {
     /// Step 1. Register a compute provider (a person renting out idle GPUs).
     ///
     /// Creates three PDAs:
-    ///   market_state   — our business logic + counters
-    ///   market_vault   — token account holding escrowed payments
-    ///   receipt_mint   — mint for "receipt" tokens = proof of deposit
+    ///   market_state   â€” our business logic + counters
+    ///   market_vault   â€” token account holding escrowed payments
+    ///   receipt_mint   â€” mint for "receipt" tokens = proof of deposit
     pub fn initialize_market(
         ctx: Context<InitializeMarket>,
         provider_name: String,
@@ -56,7 +56,7 @@ pub mod gpulease {
 
     /// Step 2. A customer places an order and locks payment in the vault.
     ///
-    /// On-chain escrow: tokens move customer → market_vault. Customer gets
+    /// On-chain escrow: tokens move customer â†’ market_vault. Customer gets
     /// receipt tokens back. Nobody can take the money until settle_order is
     /// called, so the provider cannot run away and the customer cannot chargeback.
     ///
@@ -80,7 +80,7 @@ pub mod gpulease {
 
         require!(receipts > 0, MarketError::ReceiptTooSmall);
 
-        // 1. Lock payment: customer → market_vault
+        // 1. Lock payment: customer â†’ market_vault
         token::transfer(
             CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
@@ -135,7 +135,7 @@ pub mod gpulease {
     /// Step 3. Provider settles: burns receipts, releases payment.
     ///
     /// Only the provider who registered the market can call this.
-    /// Receipts are burned, so the customer's proof disappears — that is
+    /// Receipts are burned, so the customer's proof disappears â€” that is
     /// the "work delivered" signal recorded on-chain.
     pub fn settle_order(ctx: Context<SettleOrder>, receipts_burned: u64) -> Result<()> {
         require!(receipts_burned > 0, MarketError::ZeroAmount);
@@ -171,7 +171,7 @@ pub mod gpulease {
             receipts_burned,
         )?;
 
-        // 2. Release escrow: market_vault → provider
+        // 2. Release escrow: market_vault â†’ provider
         token::transfer(
             CpiContext::new_with_signer(
                 ctx.accounts.token_program.to_account_info(),
@@ -235,7 +235,7 @@ pub struct InitializeMarket<'info> {
     )]
     pub market_vault: Account<'info, TokenAccount>,
 
-    /// Receipt mint — controlled by market_state PDA
+    /// Receipt mint â€” controlled by market_state PDA
     #[account(
         init,
         payer = provider,
@@ -291,7 +291,7 @@ pub struct PlaceOrder<'info> {
     )]
     pub customer_payment_account: Account<'info, TokenAccount>,
 
-    /// Customer's receipt account — gets filled
+    /// Customer's receipt account â€” gets filled
     #[account(
         mut,
         token::mint = receipt_mint,
@@ -332,7 +332,7 @@ pub struct SettleOrder<'info> {
     )]
     pub receipt_mint: Account<'info, Mint>,
 
-    /// Provider's account — receives the payout
+    /// Provider's account â€” receives the payout
     #[account(
         mut,
         token::mint = market_state.payment_mint,
@@ -368,10 +368,10 @@ pub struct MarketState {
     pub payment_mint: Pubkey,    // 32
     pub market_vault: Pubkey,    // 32
     pub receipt_mint: Pubkey,    // 32
-    pub provider_name: String,   // 4 + n — max 64
+    pub provider_name: String,   // 4 + n â€” max 64
     pub gpu_count: u32,          // 4
-    pub total_paid: u64,         // 8  — escrow balance
-    pub total_receipts: u64,     // 8  — outstanding receipts
+    pub total_paid: u64,         // 8  â€” escrow balance
+    pub total_receipts: u64,     // 8  â€” outstanding receipts
     pub orders_completed: u32,   // 4
     pub orders_cancelled: u32,   // 4
     pub bump: u8,                // 1
@@ -386,7 +386,7 @@ impl MarketState {
 pub enum MarketError {
     #[msg("Amount must be greater than zero")]
     ZeroAmount,
-    #[msg("Receipts would be zero — order too small")]
+    #[msg("Receipts would be zero â€” order too small")]
     ReceiptTooSmall,
     #[msg("Payout too small")]
     PayoutTooSmall,

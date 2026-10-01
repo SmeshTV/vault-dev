@@ -1,4 +1,4 @@
-[toolchain]
+﻿[toolchain]
 anchor_version = "0.31.1"
 
 [features]
@@ -6,10 +6,10 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-gpulease = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+gpulease = "FR5U3cAx8jhCn2vH9WHcYfqgx11qEzaDdZ5afMooLkJY"
 
 [programs.devnet]
-gpulease = "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS"
+gpulease = "FR5U3cAx8jhCn2vH9WHcYfqgx11qEzaDdZ5afMooLkJY"
 
 [registry]
 url = "https://api.apr.dev"
