@@ -1,18 +1,14 @@
 {
-  "name": "vault-simple",
+  "name": "gpulease",
   "version": "0.1.0",
   "scripts": {
     "build": "anchor build",
-    "test": "anchor test --provider.cluster devnet --skip-local-validator --skip-deploy",
-    "deploy": "anchor deploy --provider.cluster devnet",
-    "open-position": "npx ts-node scripts/open-position.ts"
+    "test": "anchor test --provider.cluster devnet --skip-local-validator",
+    "deploy": "anchor deploy --provider.cluster devnet"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.31.1",
-    "@raydium-io/raydium-sdk-v2": "^0.2.41-alpha",
-    "bn.js": "^5.2.3",
-    "bs58": "^6.0.0",
-    "decimal.js": "^10.6.0"
+    "bn.js": "^5.2.3"
   },
   "devDependencies": {
     "@solana/spl-token": "^0.4.9",
