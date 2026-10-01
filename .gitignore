@@ -18,6 +18,10 @@ wallet.json
 id.json
 devnet-wallet.json
 
+# Test helper keypairs (never commit — these are real signing keys)
+.customer-test-key.json
+*.customer-key.json
+
 # IDE
 .DS_Store
 .vscode/
