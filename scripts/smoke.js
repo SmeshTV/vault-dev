@@ -56,7 +56,7 @@ const pda = (seeds) =>
   PublicKey.findProgramAddressSync(
     seeds.map((s) => (typeof s === "string" ? Buffer.from(s) : s.toBuffer())),
     PROGRAM
-  ).toString(); // returns [key, bump]
+  )[0];
 
 const ix = (name, data, keys) =>
   new TransactionInstruction({ programId: PROGRAM, keys, data: Buffer.concat([disc(name), data]) });
@@ -104,35 +104,42 @@ const readMarket = async (addr) => {
 
   // fund customer from provider â€” avoids the devnet faucet entirely
   const bal = await connection.getBalance(provider.publicKey);
-  console.log("provider balance:", bal / LAMPORTS_PER_SOL, "SOL");
-  const FUND = Math.floor((bal / LAMPORTS_PER_SOL - 0.15) * LAMPORTS_PER_SOL);
-  if (FUND < 0.05 * LAMPORTS_PER_SOL) {
+  const custBal = await connection.getBalance(customer.publicKey);
+  console.log("provider balance:", (bal / LAMPORTS_PER_SOL).toFixed(6), "SOL");
+  console.log("customer balance:", (custBal / LAMPORTS_PER_SOL).toFixed(6), "SOL");
+
+  // One run costs ~0.013 SOL in rent (payment mint + 3 ATAs + 3 market PDAs)
+  // plus ~10k lamports of fees. The customer only ever pays fees, so top it
+  // up once and reuse it across runs.
+  const MIN = Math.floor(0.016 * LAMPORTS_PER_SOL);
+  if (bal < MIN) {
     console.error("\n!! Not enough SOL to run the test.");
-    console.error("   Need at least 0.2 SOL on " + provider.publicKey.toBase58());
+    console.error("   Have " + (bal / LAMPORTS_PER_SOL).toFixed(6) + ", need at least 0.016");
     console.error("   Top up: https://faucet.solana.com");
     process.exit(1);
   }
-  {
+  if (custBal < Math.floor(0.01 * LAMPORTS_PER_SOL)) {
+    const FUND = Math.min(Math.floor(0.03 * LAMPORTS_PER_SOL), bal - MIN);
     const tx = new Transaction().add(SystemProgram.transfer({
       fromPubkey: provider.publicKey, toPubkey: customer.publicKey, lamports: FUND,
     }));
     const sig = await sendAndConfirmTransaction(connection, tx, [provider]);
     console.log(`1. funded customer with ${(FUND / LAMPORTS_PER_SOL).toFixed(4)} SOL (no faucet)`);
     console.log("   -> https://explorer.solana.com/tx/" + sig + "?cluster=devnet\n");
+  } else {
+    console.log("1. customer already funded, skipping top-up\n");
   }
 
   // payment token customers pay in
   const paymentMint = await createMint(connection, provider, provider.publicKey, null, 6);
   console.log("2. created payment mint:", paymentMint.toBase58());
 
-  const [marketState]  = pda(["market", paymentMint]);
-  const [marketVault]  = pda(["market_vault", paymentMint]);
-  const [receiptMint]  = pda(["receipt_mint", paymentMint]);
+  const marketState = pda(["market", paymentMint]);
+  const marketVault = pda(["market_vault", paymentMint]);
+  const receiptMint = pda(["receipt_mint", paymentMint]);
 
-  for (const a of [
-    getAssociatedTokenAddressSync(paymentMint, provider.publicKey, true),
-    getAssociatedTokenAddressSync(paymentMint, customer.publicKey, true),
-  ]) await createAssociatedTokenAccount(connection, provider, paymentMint, a, provider.publicKey);
+  await createAssociatedTokenAccount(connection, provider, paymentMint, provider.publicKey);
+  await createAssociatedTokenAccount(connection, provider, paymentMint, customer.publicKey);
 
   // ---- initialize_market
   const nameArg = borshString("Arman_GPU_2060");
@@ -161,7 +168,7 @@ const readMarket = async (addr) => {
 
   // receipt ATA must exist before place_order
   const custReceiptAcc = getAssociatedTokenAddressSync(receiptMint, customer.publicKey, true);
-  await createAssociatedTokenAccount(connection, provider, receiptMint, custReceiptAcc, provider.publicKey);
+  await createAssociatedTokenAccount(connection, provider, receiptMint, customer.publicKey, true);
 
   // ---- place_order 100
   const amt1 = Buffer.alloc(8); amt1.writeBigUInt64LE(100n, 0);
@@ -207,6 +214,15 @@ const readMarket = async (addr) => {
 
   // ---- unauthorized settle must fail
   const stranger = Keypair.generate();
+  // Fund the stranger so the rejection comes from the access-control
+  // constraint, not from "account has no lamports".
+  await sendAndConfirmTransaction(connection, new Transaction().add(
+    SystemProgram.transfer({
+      fromPubkey: customer.publicKey, toPubkey: stranger.publicKey,
+      lamports: Math.floor(0.01 * LAMPORTS_PER_SOL),
+    })
+  ), [customer]);
+  console.log("6. stranger tries to settle someone else's market (funded 0.01 SOL first)");
   const burn2 = Buffer.alloc(8); burn2.writeBigUInt64LE(10n, 0);
   let blocked = false;
   try {
@@ -219,12 +235,23 @@ const readMarket = async (addr) => {
       { pubkey: stranger.publicKey, isSigner: true, isWritable: true },
       { pubkey: customer.publicKey, isSigner: true, isWritable: false },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-    ]), [stranger, customer], "6. stranger tries to settle");
+    ]), [stranger, customer], "6. stranger settles");
   } catch (e) {
-    blocked = /Unauthorized|0x1|failed to send/i.test(e.message);
-    console.log("   REJECTED ->", e.message.slice(0, 120));
+    const txt = (e.logs || []).join(" ") + " " + (e.message || "");
+    blocked = /Unauthorized|6006|Custom program error/i.test(txt);
+    console.log("   REJECTED by the program ->", txt.replace(/\s+/g, " ").slice(0, 200));
   }
-  console.assert(blocked, "FAIL: stranger was not blocked");
+  console.assert(blocked, "FAIL: stranger was not blocked by the constraint");
 
   console.log("\n=== ALL CHECKS PASSED ===");
-})().catch((e) => { console.error("TEST FAILED:", e.message); process.exit(1); });
+})().catch((e) => {
+  console.error("\nTEST FAILED");
+  console.error("  name:", e && e.name);
+  console.error("  message:", JSON.stringify(e && e.message));
+  console.error("  stack:", e && e.stack ? e.stack.split("\n").slice(0, 4).join("\n         ") : "");
+  for (const k of Object.keys(e || {})) {
+    if (["name", "message", "stack", "logs"].includes(k)) continue;
+    console.error("  ", k, "=", JSON.stringify(e[k]));
+  }
+  process.exit(1);
+});
